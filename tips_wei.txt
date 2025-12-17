@@ -1,0 +1,3 @@
+npm run electron:dev
+pkill -f Electron && lsof -ti:5173 | xargs kill -9
+
