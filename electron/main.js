@@ -20,10 +20,12 @@ function createWindow() {
         width: width,
         height: height,
         webPreferences: {
-            webviewTag: true, // Critical for embedding 3rd party sites
-            nodeIntegration: true,
-            contextIsolation: false, // Simplifying for this MVP to allow Webview control easily
-            webSecurity: true // Enable security for auth flows
+            webviewTag: true, // Required for the app's core functionality
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+            webSecurity: true,
+            preload: path.join(__dirname, 'preload.js')
         },
     });
 
