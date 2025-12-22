@@ -1,9 +1,13 @@
-import { app, BrowserWindow, screen } from 'electron';
+import { app, BrowserWindow, screen, ipcMain } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import LicenseManager from './license.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize License Manager
+const licenseManager = new LicenseManager(app.getPath('userData'));
 
 // Hide automation flags
 app.commandLine.appendSwitch('disable-blink-features', 'AutomationControlled');
@@ -28,6 +32,27 @@ function createWindow() {
             preload: path.join(__dirname, 'preload.js')
         },
     });
+
+    // Handle License IPC
+    ipcMain.handle('license:activate', async (event, key) => {
+        const instanceName = 'MacBook-User'; // Ideally get hostname
+        return await licenseManager.activate(key, instanceName);
+    });
+
+    ipcMain.handle('license:check', async () => {
+        return await licenseManager.validate();
+    });
+
+    // Check License on Launch
+    const license = licenseManager.getLicense();
+    let isActivated = false;
+
+    // Simple check: do we have a file? 
+    // Ideally we validate online here, but to avoid blocking UI startup, 
+    // we let the frontend trigger the validation or just rely on file existence first.
+    if (license && license.key) {
+        isActivated = true;
+    }
 
     // USER SUGGESTED FIX: Dynamic User-Agent Cleaning
     const originalUserAgent = mainWindow.webContents.userAgent;
@@ -71,6 +96,9 @@ function createWindow() {
 
     const startUrl = process.env.VITE_DEV_SERVER_URL || `file://${path.join(__dirname, '../dist/index.html')}`;
 
+    // We load the app regardless, but we can pass the license state to the renderer
+    // Alternatively, we could load a separate 'gate.html'
+    // For React Single Page Apps, it's often better to load the App and let React render the Gate component.
     mainWindow.loadURL(startUrl);
 
     // Open DevTools in development

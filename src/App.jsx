@@ -1,85 +1,72 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Send, Settings, AlertTriangle } from 'lucide-react';
 import WebviewPanel from './components/WebviewPanel';
 import InputArea from './components/InputArea';
+import LicenseGate from './components/LicenseGate'; // [NEW] Import License Gate
 
 function App() {
   const gptWebviewRef = useRef(null);
   const geminiWebviewRef = useRef(null);
   const [showWarning, setShowWarning] = useState(true);
 
-  // Injection Scripts
-  // Updated for late 2024 selectors (estimated)
-  // These are BRITTLE and will likely need tuning.
+  // [NEW] License State
+  const [isLicensed, setIsLicensed] = useState(false);
+  const [checkingLicense, setCheckingLicense] = useState(true);
 
-  const injectGeneric = (text, selector) => `
-    const tryFill = () => {
-      const el = document.querySelector('${selector}');
-      if (el) {
-        el.focus();
-        el.textContent = ${JSON.stringify(text)}; 
-        // Newer frameworks need input events to register changes
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        
-        // Try to find send button or simulate enter
-        setTimeout(() => {
-           // Common strategy: enter key on the input
-           const enterEvent = new KeyboardEvent('keydown', {
-             bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
-           });
-           el.dispatchEvent(enterEvent);
-        }, 100);
-        return true;
+  // [NEW] Check license on mount
+  useEffect(() => {
+    const checkLicense = async () => {
+      try {
+        // window.myAppAPI is exposed by electron/preload.js
+        if (window.myAppAPI) {
+          const result = await window.myAppAPI.checkLicense();
+          if (result && result.valid) {
+            setIsLicensed(true);
+          }
+        } else {
+          // Fallback for dev mode without Electron (optional)
+          // setTimeout(() => setIsLicensed(true), 1000); 
+        }
+      } catch (e) {
+        console.error("License check failed:", e);
+      } finally {
+        setCheckingLicense(false);
       }
-      return false;
-    }
-    tryFill();
-  `;
+    };
 
-  // ChatGPT Specifics
-  // Often uses a contenteditable div or textarea.
+    checkLicense();
+  }, []);
+
+  // Injection Scripts
   const injectChatGPT = (text) => `
-    (function() {
+    (function () {
       const el = document.querySelector('#prompt-textarea');
       if (el) {
         el.focus();
         el.innerText = ${JSON.stringify(text)};
         el.dispatchEvent(new Event('input', { bubbles: true }));
-        
         setTimeout(() => {
-            const btn = document.querySelector('[data-testid="send-button"]');
-            if(btn) {
-                btn.click();
-            } else {
-                 const enterEvent = new KeyboardEvent('keydown', {
-                    bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13
-                 });
-                 el.dispatchEvent(enterEvent);
-            }
+          const btn = document.querySelector('[data-testid="send-button"]');
+          if (btn) btn.click();
+          else {
+            const enterEvent = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13 });
+            el.dispatchEvent(enterEvent);
+          }
         }, 500);
-      } else {
-        console.log("Input not found");
       }
     })();
   `;
 
-  // Gemini Specifics
   const injectGemini = (text) => `
-    (function() {
-      // Gemini often uses complex rich text editors.
-      // Selector strategy: contenteditable div inside the main input area
-      const el = document.querySelector('div[contenteditable="true"]'); 
-      // Fallback or specific class searches might be needed
-      
+    (function () {
+      const el = document.querySelector('div[contenteditable="true"]');
       if (el) {
         el.focus();
-        el.innerText = ${JSON.stringify(text)}; 
+        el.innerText = ${JSON.stringify(text)};
         el.dispatchEvent(new Event('input', { bubbles: true }));
-        
-        // Wait and click send
         setTimeout(() => {
-           const btn = document.querySelector('.send-button') || document.querySelector('button[aria-label*="Send"]'); 
-           if (btn) btn.click();
+          const btn = document.querySelector('.send-button') || document.querySelector('button[aria-label*="Send"]');
+          if (btn) btn.click();
         }, 500);
       }
     })();
@@ -98,9 +85,17 @@ function App() {
     }
   };
 
+  // [NEW] Conditional Rendering for License Gate
+  if (checkingLicense) {
+    return <div className="h-screen w-screen bg-gray-900 flex items-center justify-center text-white">Loading...</div>;
+  }
+
+  if (!isLicensed) {
+    return <LicenseGate onActivated={() => setIsLicensed(true)} />;
+  }
+
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-50 overflow-hidden">
-      {/* Header */}
       {/* Header - Only shown for warning or controls */}
       {showWarning && (
         <header className="flex items-center justify-center px-6 py-2 bg-slate-900 border-b border-slate-800 z-50">
