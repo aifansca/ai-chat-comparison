@@ -35,7 +35,7 @@ class LicenseManager {
                 url: 'https://api.lemonsqueezy.com/v1/licenses/activate',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/x-www-form-urlencoded' // Lemon Squeezy expects form/json
+                    'Content-Type': 'application/json' // Lemon Squeezy expects form/json
                 }
             });
 
@@ -96,7 +96,7 @@ class LicenseManager {
                 url: 'https://api.lemonsqueezy.com/v1/licenses/validate',
                 headers: {
                     'Accept': 'application/json',
-                    'Content-Type': 'application/x-www-form-urlencoded'
+                    'Content-Type': 'application/json'
                 }
             });
 
